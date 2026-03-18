@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<main>
+    <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div class="vocab-word" id="vokabel">Wähle Lektionen</div>
+    <div class="vocab-translation" id="uebersetzung"></div>
+    
+    <div class="controls" id="controls" style="display: none;">
+        <button class="control-btn btn-wrong" onclick="submitResult(false)">Falsch</button>
+        <button class="control-btn btn-correct" onclick="submitResult(true)">Richtig</button>
+    </div>
+
+    <div class="session-stats" id="sessionStats" style="display: none;">
+        <span class="stat-item stat-correct" id="statCorrect">0</span>
+        <span class="stat-divider">/</span>
+        <span class="stat-item stat-wrong" id="statWrong">0</span>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="hinweis">
+        <kbd>Leertaste</kbd> zeigen · <kbd>↑</kbd><kbd>↓</kbd> antworten
+    </div>
+</main>
+
+<div class="counter" id="counter" style="display: none;"></div>
+
+<div class="lektion-popup" id="lektionPopup">
+    <div class="lektion-popup-inner">
+        <h2>Lektionen wählen</h2>
+        <div class="lektion-list">
+            {% if lessons %}
+                {% for lesson in lessons %}
+                <div>
+                    <input type="checkbox" id="l{{ lesson.id }}" class="lektion-checkbox" value="{{ lesson.id }}">
+                    <label for="l{{ lesson.id }}" class="lektion-label">{{ lesson.name }}</label>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Keine Lektionen gefunden.</p>
+                <a href="{{ url_for('import_data') }}" class="start-btn" style="text-decoration: none; display: block; margin-top: 1rem;">Daten importieren</a>
+            {% endif %}
+        </div>
+        {% if lessons %}
+        <button class="start-btn" onclick="startSession()">Starten</button>
+        {% endif %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

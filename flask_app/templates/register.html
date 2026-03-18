@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Konto erstellen</h1>
+            <p>Startete dein Vokabeltraining</p>
+        </div>
+        
+        <form action="" method="post" class="auth-form">
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input type="text" name="username" id="username" required placeholder="Wähle einen Benutzernamen">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input type="password" name="password" id="password" required placeholder="Wähle ein Passwort">
+            </div>
+            
+            <button type="submit" class="auth-btn">Registrieren</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Bereits ein Konto? <a href="{{ url_for('login') }}">Anmelden</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

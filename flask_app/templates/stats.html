@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<main class="stats-page">
+    <h1>Dein Fortschritt</h1>
+    
+    <div class="lesson-stats">
+        {% for lesson in lessons %}
+        <div class="lesson-stat-card" data-lesson-id="{{ lesson.id }}">
+            <div class="lesson-stat-header">
+                <h3>{{ lesson.name }}</h3>
+                <span class="lesson-progress-text">0%</span>
+            </div>
+            <div class="lesson-progress-bar">
+                <div class="lesson-progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="lesson-stat-details">
+                <span class="word-count">0 / 0 Vokabeln</span>
+                <span class="weak-count">0 schwierige</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+
+<script>
+async function loadLessonStats() {
+    const cards = document.querySelectorAll('.lesson-stat-card');
+    const lessonIds = Array.from(cards).map(c => parseInt(c.dataset.lessonId));
+    
+    try {
+        const response = await fetch('/api/get_progress_breakdown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lessons: lessonIds }),
+        });
+        
+        const data = await response.json();
+        
+        data.forEach(lessonData => {
+            const card = document.querySelector(`[data-lesson-id="${lessonData.lesson_id}"]`);
+            if (!card) return;
+            
+            const progress = Math.round(lessonData.progress * 100);
+            card.querySelector('.lesson-progress-fill').style.width = progress + '%';
+            card.querySelector('.lesson-progress-text').textContent = progress + '%';
+            card.querySelector('.word-count').textContent = 
+                `${lessonData.word_count - lessonData.weak_count} / ${lessonData.word_count} Vokabeln`;
+            card.querySelector('.weak-count').textContent = 
+                `${lessonData.weak_count} schwierige`;
+        });
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+loadLessonStats();
+</script>
+{% endblock %}

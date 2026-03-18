@@ -1,0 +1,1 @@
+When changing something on the algorithem always update the the_algrorithm.md file.

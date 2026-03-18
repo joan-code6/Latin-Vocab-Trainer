@@ -1,0 +1,6 @@
+flask
+flask-sqlalchemy
+flask-login
+werkzeug
+SQLAlchemy==1.4.49
+gunicorn
