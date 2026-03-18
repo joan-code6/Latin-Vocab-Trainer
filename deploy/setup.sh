@@ -2,6 +2,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "=== Latin Vocab Trainer Setup ==="
 echo ""
 
@@ -24,17 +27,15 @@ echo "Creating application directory..."
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-if [ ! -d ".git" ]; then
+if [ -n "$REPO_URL" ]; then
     echo "Cloning repository..."
-    if [ -z "$REPO_URL" ]; then
-        echo "REPO_URL not set. Please set it or manually copy files."
-        echo "Example: REPO_URL=https://github.com/yourusername/Latin-Vocab-Trainer.git ./setup.sh"
-        exit 1
-    fi
     git clone "$REPO_URL" .
+elif [ -f "$PROJECT_DIR/flask_app/app.py" ]; then
+    echo "Copying local files from $PROJECT_DIR..."
+    cp -r "$PROJECT_DIR/"* .
 else
-    echo "Repository already exists, pulling latest..."
-    git pull
+    echo "Error: No repository URL provided and no local files found."
+    exit 1
 fi
 
 echo ""
@@ -54,17 +55,17 @@ fi
 
 echo ""
 echo "Setting up systemd service..."
-cp deploy/latin-vocab.service /etc/systemd/system/
-sed -i "s|/var/www/latin-vocab-trainer|$INSTALL_DIR|g" /etc/systemd/system/latin-vocab.service
-sed -i "s|5000|$PORT|g" /etc/systemd/system/latin-vocab.service
+sed -e "s|/var/www/latin-vocab-trainer|$INSTALL_DIR|g" \
+    -e "s|127.0.0.1:5000|127.0.0.1:$PORT|g" \
+    "$SCRIPT_DIR/latin-vocab.service" > /etc/systemd/system/latin-vocab.service
 
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
 echo ""
 echo "Setting up nginx..."
-cp deploy/nginx.conf /etc/nginx/sites-available/latin-vocab
-sed -i "s|latin-vocab.trainer|$DOMAIN|g" /etc/nginx/sites-available/latin-vocab
+DOMAIN_HOSTNAME=$(echo "$DOMAIN" | sed 's|https://||' | sed 's|http://||' | cut -d':' -f1 | cut -d'/' -f1)
+sed "s|latin-vocab.trainer|$DOMAIN_HOSTNAME|g" "$SCRIPT_DIR/nginx.conf" > /etc/nginx/sites-available/latin-vocab
 sed -i "s|127.0.0.1:5000|127.0.0.1:$PORT|g" /etc/nginx/sites-available/latin-vocab
 
 ln -sf /etc/nginx/sites-available/latin-vocab /etc/nginx/sites-enabled/
