@@ -1,12 +1,13 @@
 from flask import render_template, flash, redirect, url_for, request, jsonify
-from app import app, db
-from models import User, Lesson, Word, UserWordStats
 from flask_login import current_user, login_user, logout_user, login_required
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import json
 import os
 import random
+
+from app import app, db
+from models import User, Lesson, Word, UserWordStats
 
 LEARNING_POOL_SIZE = 6
 STREAK_TO_LEARN = 3
