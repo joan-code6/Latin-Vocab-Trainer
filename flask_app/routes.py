@@ -389,32 +389,69 @@ def stats():
 def import_data():
     base_path = os.path.dirname(os.path.abspath(__file__))
     workspace_root = os.path.dirname(base_path)
-    
+
     imported_count = 0
-    
-    for filename in os.listdir(workspace_root):
-        if filename.startswith('L') and filename.endswith('.json') and 'LT' not in filename:
-            lesson_name = filename.replace('.json', '')
-            
-            lesson = Lesson.query.filter_by(name=lesson_name).first()
-            if not lesson:
-                lesson = Lesson(name=lesson_name)
-                db.session.add(lesson)
-                db.session.commit()
-            
-            try:
-                with open(os.path.join(workspace_root, filename), 'r', encoding='utf-8') as f:
-                    words_data = json.load(f)
-                    
-                    for w in words_data:
-                        existing_word = Word.query.filter_by(lesson_id=lesson.id, latin=w['latein']).first()
-                        if not existing_word:
-                            new_word = Word(lesson_id=lesson.id, latin=w['latein'], german=w['deutsch'])
-                            db.session.add(new_word)
-                            imported_count += 1
-                    db.session.commit()
-            except Exception as e:
-                print(f"Error importing {filename}: {e}")
-                
-    flash(f"Imported {imported_count} words successfully.")
+    missing_files = []
+    import_errors = []
+
+    lesson_files = []
+    index_path = os.path.join(workspace_root, 'index.json')
+    if os.path.exists(index_path):
+        try:
+            with open(index_path, 'r', encoding='utf-8') as f:
+                lessons_data = json.load(f)
+            for lesson_info in lessons_data:
+                path = lesson_info.get('path')
+                if isinstance(path, str) and path.endswith('.json'):
+                    lesson_files.append(path)
+        except Exception as e:
+            import_errors.append(f"index.json: {e}")
+
+    if not lesson_files:
+        for filename in os.listdir(workspace_root):
+            if filename.startswith('L') and filename.endswith('.json') and 'LT' not in filename:
+                lesson_files.append(filename)
+
+    for filename in sorted(set(lesson_files)):
+        lesson_path = os.path.join(workspace_root, filename)
+        if not os.path.exists(lesson_path):
+            missing_files.append(filename)
+            continue
+
+        lesson_name = os.path.splitext(os.path.basename(filename))[0]
+
+        lesson = Lesson.query.filter_by(name=lesson_name).first()
+        if not lesson:
+            lesson = Lesson(name=lesson_name)
+            db.session.add(lesson)
+            db.session.commit()
+
+        try:
+            with open(lesson_path, 'r', encoding='utf-8') as f:
+                words_data = json.load(f)
+
+            for w in words_data:
+                latin = w.get('latein')
+                german = w.get('deutsch')
+                if not latin or not german:
+                    continue
+
+                existing_word = Word.query.filter_by(lesson_id=lesson.id, latin=latin).first()
+                if not existing_word:
+                    new_word = Word(lesson_id=lesson.id, latin=latin, german=german)
+                    db.session.add(new_word)
+                    imported_count += 1
+
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            import_errors.append(f"{filename}: {e}")
+
+    message = f"Imported {imported_count} words successfully."
+    if missing_files:
+        message += f" Missing files: {', '.join(missing_files)}."
+    if import_errors:
+        message += f" Import errors: {' | '.join(import_errors[:3])}."
+
+    flash(message)
     return redirect(url_for('index'))
