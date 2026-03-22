@@ -407,10 +407,9 @@ def import_data():
         except Exception as e:
             import_errors.append(f"index.json: {e}")
 
-    if not lesson_files:
-        for filename in os.listdir(workspace_root):
-            if filename.startswith('L') and filename.endswith('.json') and 'LT' not in filename:
-                lesson_files.append(filename)
+    for filename in os.listdir(workspace_root):
+        if filename.startswith('L') and filename.endswith('.json') and 'LT' not in filename:
+            lesson_files.append(filename)
 
     for filename in sorted(set(lesson_files)):
         lesson_path = os.path.join(workspace_root, filename)
