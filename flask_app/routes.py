@@ -6,8 +6,12 @@ import json
 import os
 import random
 
-from app import app, db
-from models import User, Lesson, Word, UserWordStats
+try:
+    from .app import app, db
+    from .models import User, Lesson, Word, UserWordStats
+except ImportError:
+    from app import app, db
+    from models import User, Lesson, Word, UserWordStats
 
 LEARNING_POOL_SIZE = 6
 STREAK_TO_LEARN = 3

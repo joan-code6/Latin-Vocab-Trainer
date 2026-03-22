@@ -1,9 +1,14 @@
 from flask import Flask
-from config import Config
-from models import db, User, Lesson, Word
 from flask_login import LoginManager
 import json
 import os
+
+try:
+    from .config import Config
+    from .models import db, User, Lesson, Word
+except ImportError:
+    from config import Config
+    from models import db, User, Lesson, Word
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -16,7 +21,10 @@ login.login_view = 'login'
 def load_user(id):
     return User.query.get(int(id))
 
-from routes import *
+try:
+    from .routes import *
+except ImportError:
+    from routes import *
 
 if __name__ == '__main__':
     with app.app_context():
