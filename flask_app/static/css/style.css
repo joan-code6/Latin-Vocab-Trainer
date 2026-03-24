@@ -223,6 +223,34 @@ body.dark-mode .btn-correct:hover {
     opacity: 0.5;
 }
 
+.mobile-fullscreen-btn {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 900;
+    display: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 0.7rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    font-family: var(--font);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.mobile-fullscreen-btn:active {
+    transform: scale(0.97);
+}
+
+.mobile-fullscreen-btn.hidden {
+    display: none !important;
+}
+
 .lektion-popup {
     position: fixed;
     inset: 0;
@@ -413,6 +441,14 @@ body.minimal-mode .counter {
     .control-btn {
         padding: 0.75rem 1.5rem;
         font-size: 0.85rem;
+    }
+
+    .counter {
+        bottom: 4.2rem;
+    }
+
+    .mobile-fullscreen-btn {
+        display: block;
     }
 }
 

@@ -4,6 +4,8 @@ let currentWord = null;
 let showingTranslation = false;
 let isActive = false;
 
+const fullscreenBtn = document.getElementById('mobileFullscreenBtn');
+
 let sessionStats = { 
     total: 0, 
     correct: 0, 
@@ -12,6 +14,66 @@ let sessionStats = {
     demoted: 0,
     startTime: null 
 };
+
+function isFullscreenSupported() {
+    return !!(
+        document.fullscreenEnabled ||
+        document.webkitFullscreenEnabled ||
+        document.msFullscreenEnabled
+    );
+}
+
+function getFullscreenElement() {
+    return (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.msFullscreenElement ||
+        null
+    );
+}
+
+function updateFullscreenButtonLabel() {
+    if (!fullscreenBtn) return;
+    fullscreenBtn.textContent = getFullscreenElement() ? 'Normal' : 'Vollbild';
+}
+
+function enterFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) return el.requestFullscreen();
+    if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+    if (el.msRequestFullscreen) return el.msRequestFullscreen();
+    return Promise.resolve();
+}
+
+function exitFullscreen() {
+    if (document.exitFullscreen) return document.exitFullscreen();
+    if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+    if (document.msExitFullscreen) return document.msExitFullscreen();
+    return Promise.resolve();
+}
+
+function toggleFullscreen() {
+    if (getFullscreenElement()) {
+        exitFullscreen().catch(() => {});
+    } else {
+        enterFullscreen().catch(() => {});
+    }
+}
+
+if (fullscreenBtn) {
+    if (!isFullscreenSupported()) {
+        fullscreenBtn.classList.add('hidden');
+    } else {
+        fullscreenBtn.addEventListener('click', () => {
+            toggleFullscreen();
+        });
+
+        updateFullscreenButtonLabel();
+        document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButtonLabel);
+        document.addEventListener('MSFullscreenChange', updateFullscreenButtonLabel);
+    }
+}
 
 function startSession() {
     const checkboxes = document.querySelectorAll('.lektion-checkbox:checked');

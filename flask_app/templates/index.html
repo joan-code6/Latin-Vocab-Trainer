@@ -29,6 +29,10 @@
 
 <div class="counter" id="counter" style="display: none;"></div>
 
+<button class="mobile-fullscreen-btn" id="mobileFullscreenBtn" type="button" aria-label="Vollbild umschalten" title="Vollbild">
+    Vollbild
+</button>
+
 <div class="lektion-popup" id="lektionPopup">
     <div class="lektion-popup-inner">
         <h2>Lektionen wählen</h2>
@@ -51,5 +55,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js', v='20260324-fullscreen') }}"></script>
 {% endblock %}
