@@ -84,8 +84,6 @@ def get_next_word():
     if not words:
         return jsonify({'error': 'No words available'}), 400
 
-    selected_lesson_count = len({w.lesson_id for w in words})
-    
     word_stats = {}
     for word in words:
         stats = UserWordStats.query.filter_by(user_id=current_user.id, word_id=word.id).first()
@@ -119,32 +117,10 @@ def get_next_word():
         needed = LEARNING_POOL_SIZE - len(learning_pool)
         rest_by_conf = sorted(rest_pool, key=lambda x: x['confidence'])
 
-        if selected_lesson_count > 1:
-            lesson_queues = {}
-            for item in rest_by_conf:
-                lesson_queues.setdefault(item['word'].lesson_id, []).append(item)
-
-            moved = []
-            while needed > 0 and lesson_queues:
-                for lesson_id in list(lesson_queues.keys()):
-                    if needed <= 0:
-                        break
-                    queue = lesson_queues[lesson_id]
-                    if queue:
-                        moved_item = queue.pop(0)
-                        moved.append(moved_item)
-                        needed -= 1
-                    if not queue:
-                        del lesson_queues[lesson_id]
-
-            moved_ids = {item['word'].id for item in moved}
-            learning_pool.extend(moved)
-            rest_pool = [item for item in rest_pool if item['word'].id not in moved_ids]
-        else:
-            for i in range(min(needed, len(rest_by_conf))):
-                learning_pool.append(rest_by_conf[i])
-            moved_ids = {item['word'].id for item in learning_pool}
-            rest_pool = [item for item in rest_pool if item['word'].id not in moved_ids]
+        for i in range(min(needed, len(rest_by_conf))):
+            learning_pool.append(rest_by_conf[i])
+        moved_ids = {item['word'].id for item in learning_pool}
+        rest_pool = [item for item in rest_pool if item['word'].id not in moved_ids]
     
     learning_pool.sort(key=lambda x: (x['negative_streak'] > 0, x['confidence']))
 
@@ -160,23 +136,6 @@ def get_next_word():
         candidates = exclude_last(pool)
         if not candidates:
             return None
-
-        if selected_lesson_count > 1:
-            by_lesson = {}
-            for item in candidates:
-                by_lesson.setdefault(item['word'].lesson_id, []).append(item)
-
-            chosen_lesson = random.choice(list(by_lesson.keys()))
-            lesson_candidates = by_lesson[chosen_lesson]
-
-            if key_fn is not None:
-                lesson_candidates = sorted(lesson_candidates, key=key_fn, reverse=reverse)
-
-            if focused_band and len(lesson_candidates) > 2:
-                band_size = max(2, min(6, len(lesson_candidates) // 3))
-                lesson_candidates = lesson_candidates[:band_size]
-
-            return random.choice(lesson_candidates)
 
         ordered = candidates
         if key_fn is not None:
