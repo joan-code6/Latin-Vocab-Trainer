@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<main class="live-stats-page">
+    <div class="live-stats-header">
+        <h1>Live Stats</h1>
+        <p id="liveStatsUpdated">Wird geladen...</p>
+    </div>
+
+    <div class="live-kpi-grid" id="liveKpiGrid">
+        <div class="live-kpi-card"><span>Gesamtfortschritt</span><strong id="kpiOverall">0%</strong></div>
+        <div class="live-kpi-card"><span>Lektionen</span><strong id="kpiLessons">0</strong></div>
+        <div class="live-kpi-card"><span>Vokabeln</span><strong id="kpiWords">0</strong></div>
+        <div class="live-kpi-card"><span>Gelernt</span><strong id="kpiLearned">0</strong></div>
+        <div class="live-kpi-card"><span>Schwierig</span><strong id="kpiLearning">0</strong></div>
+        <div class="live-kpi-card"><span>Neu</span><strong id="kpiUnseen">0</strong></div>
+        <div class="live-kpi-card"><span>Mastered</span><strong id="kpiMastered">0</strong></div>
+        <div class="live-kpi-card"><span>Heute wiederholt</span><strong id="kpiReviewed">0</strong></div>
+        <div class="live-kpi-card"><span>Fällig jetzt</span><strong id="kpiDue">0</strong></div>
+        <div class="live-kpi-card"><span>Durchschnittssicherheit</span><strong id="kpiConfidence">0%</strong></div>
+    </div>
+
+    <section class="live-lessons-section">
+        <h2>Lesson Breakdown</h2>
+        <div class="live-lessons-list" id="liveLessonsList"></div>
+    </section>
+</main>
+
+<script>
+async function loadLiveStats() {
+    try {
+        const response = await fetch('/api/live-stats');
+        const data = await response.json();
+        const totals = data.totals || {};
+
+        document.getElementById('kpiOverall').textContent = `${totals.overall_progress || 0}%`;
+        document.getElementById('kpiLessons').textContent = `${totals.lessons || 0}`;
+        document.getElementById('kpiWords').textContent = `${totals.words || 0}`;
+        document.getElementById('kpiLearned').textContent = `${totals.learned || 0}`;
+        document.getElementById('kpiLearning').textContent = `${totals.learning || 0}`;
+        document.getElementById('kpiUnseen').textContent = `${totals.unseen || 0}`;
+        document.getElementById('kpiMastered').textContent = `${totals.mastered || 0}`;
+        document.getElementById('kpiReviewed').textContent = `${totals.reviewed_today || 0}`;
+        document.getElementById('kpiDue').textContent = `${totals.due || 0}`;
+        document.getElementById('kpiConfidence').textContent = `${totals.avg_confidence || 0}%`;
+
+        const updatedAt = new Date();
+        document.getElementById('liveStatsUpdated').textContent = `Aktualisiert: ${updatedAt.toLocaleTimeString('de-DE')}`;
+
+        const lessons = Array.isArray(data.lessons) ? data.lessons : [];
+        const list = document.getElementById('liveLessonsList');
+        list.innerHTML = '';
+
+        if (lessons.length === 0) {
+            list.innerHTML = '<p class="live-empty">Noch keine Lesson-Daten vorhanden.</p>';
+            return;
+        }
+
+        lessons.forEach(lesson => {
+            const item = document.createElement('div');
+            item.className = 'live-lesson-item';
+            item.innerHTML = `
+                <div class="live-lesson-top">
+                    <h3>${lesson.lesson_name}</h3>
+                    <span>${lesson.progress}%</span>
+                </div>
+                <div class="live-lesson-bar">
+                    <div class="live-lesson-fill" style="width:${lesson.progress}%"></div>
+                </div>
+                <div class="live-lesson-meta">
+                    <span>${lesson.learned}/${lesson.total} gelernt</span>
+                    <span>${lesson.learning} schwierig</span>
+                    <span>${lesson.mastered} mastered</span>
+                </div>
+            `;
+            list.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Live stats error:', err);
+    }
+}
+
+loadLiveStats();
+setInterval(loadLiveStats, 5000);
+</script>
+{% endblock %}

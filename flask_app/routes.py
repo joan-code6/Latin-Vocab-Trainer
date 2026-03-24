@@ -384,18 +384,42 @@ def get_progress():
         return jsonify({'progress': 0.0})
     
     total_confidence = 0.0
+    total_accuracy = 0.0
     learned_count = 0
+
     for word in words:
         stats = UserWordStats.query.filter_by(user_id=current_user.id, word_id=word.id).first()
         if stats:
             total_confidence += stats.confidence
             if stats.is_learned:
                 learned_count += 1
+
+            correct = stats.correct_count or 0
+            wrong = stats.wrong_count or 0
+            attempts = correct + wrong
+            if attempts > 0:
+                total_accuracy += correct / attempts
+
+    total_words = len(words)
+    mastery_progress = learned_count / total_words
+    confidence_progress = total_confidence / total_words
+    accuracy_progress = total_accuracy / total_words
+
+    # Blend long-term mastery with smoother confidence/accuracy signals.
+    # This avoids progress snapping to zero after a single wrong answer.
+    blended_progress = (
+        (0.45 * mastery_progress) +
+        (0.35 * confidence_progress) +
+        (0.20 * accuracy_progress)
+    )
     
     return jsonify({
-        'progress': learned_count / len(words),
+        'progress': max(0.0, min(1.0, blended_progress)),
         'learned_count': learned_count,
-        'total_count': len(words)
+        'total_count': total_words,
+        'mastery_progress': mastery_progress,
+        'confidence_progress': confidence_progress,
+        'accuracy_progress': accuracy_progress
     })
 
 @app.route('/api/get_progress_breakdown', methods=['POST'])
@@ -455,6 +479,102 @@ def get_progress_breakdown():
 def stats():
     lessons = Lesson.query.all()
     return render_template('stats.html', lessons=lessons)
+
+@app.route('/live-stats')
+@login_required
+def live_stats_page():
+    return render_template('live_stats.html')
+
+@app.route('/api/live-stats', methods=['GET'])
+@login_required
+def live_stats_data():
+    lessons = Lesson.query.all()
+    words = Word.query.all()
+
+    stats_by_word = {}
+    user_stats = UserWordStats.query.filter_by(user_id=current_user.id).all()
+    for stat in user_stats:
+        stats_by_word[stat.word_id] = stat
+
+    total_words = len(words)
+    learned = 0
+    mastered = 0
+    learning = 0
+    unseen = 0
+    due = 0
+    reviewed_today = 0
+    confidence_sum = 0.0
+    with_stats = 0
+
+    one_day_ago = datetime.utcnow() - timedelta(days=1)
+
+    per_lesson = []
+    for lesson in lessons:
+        lesson_words = Word.query.filter_by(lesson_id=lesson.id).all()
+        lesson_total = len(lesson_words)
+
+        lesson_learned = 0
+        lesson_learning = 0
+        lesson_mastered = 0
+
+        for word in lesson_words:
+            stat = stats_by_word.get(word.id)
+            if not stat:
+                unseen += 1
+                continue
+
+            with_stats += 1
+            confidence_sum += stat.confidence
+
+            if stat.last_reviewed and stat.last_reviewed >= one_day_ago:
+                reviewed_today += 1
+
+            if stat.is_due:
+                due += 1
+
+            if stat.streak >= 5:
+                mastered += 1
+                learned += 1
+                lesson_mastered += 1
+                lesson_learned += 1
+            elif stat.is_learned:
+                learned += 1
+                lesson_learned += 1
+            elif stat.negative_streak > 0 or stat.streak > 0:
+                learning += 1
+                lesson_learning += 1
+
+        progress = round((lesson_learned / lesson_total) * 100) if lesson_total > 0 else 0
+        per_lesson.append({
+            'lesson_name': lesson.name,
+            'total': lesson_total,
+            'learned': lesson_learned,
+            'learning': lesson_learning,
+            'mastered': lesson_mastered,
+            'progress': progress
+        })
+
+    avg_confidence = round((confidence_sum / with_stats) * 100) if with_stats > 0 else 0
+
+    # Rank lessons by lowest progress first so the dashboard highlights weak spots.
+    per_lesson.sort(key=lambda x: x['progress'])
+
+    return jsonify({
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'totals': {
+            'lessons': len(lessons),
+            'words': total_words,
+            'learned': learned,
+            'learning': learning,
+            'mastered': mastered,
+            'unseen': unseen,
+            'due': due,
+            'reviewed_today': reviewed_today,
+            'avg_confidence': avg_confidence,
+            'overall_progress': round((learned / total_words) * 100) if total_words > 0 else 0
+        },
+        'lessons': per_lesson
+    })
 
 @app.route('/import_data')
 @login_required
