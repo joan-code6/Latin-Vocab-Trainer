@@ -2,50 +2,112 @@
 
 {% block content %}
 <main class="live-stats-page">
-    <div class="live-stats-header">
-        <h1>Live Stats</h1>
-        <p id="liveStatsUpdated">Wird geladen...</p>
-    </div>
+    <section class="live-hero">
+        <div class="live-hero-copy">
+            <p class="live-eyebrow">Second Screen Monitor</p>
+            <h1>Live Lernradar</h1>
+            <p class="live-subtitle">In Echtzeit sehen, wo deine Energie hingeht: Fokus, Fortschritt und faellige Karten auf einen Blick.</p>
+        </div>
+        <div class="live-hero-side">
+            <div class="live-spotlight">
+                <span>Gesamtfortschritt</span>
+                <strong id="kpiOverall">0%</strong>
+                <div class="live-spotlight-track" aria-hidden="true">
+                    <div class="live-spotlight-fill" id="heroOverallBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="live-status-row">
+                <p class="live-status-pill" id="liveStatsUpdated">Aktualisiert: -</p>
+                <p class="live-status-pill" id="liveHealthBadge">Status wird berechnet</p>
+            </div>
+        </div>
+    </section>
 
     <div class="live-kpi-grid" id="liveKpiGrid">
-        <div class="live-kpi-card"><span>Gesamtfortschritt</span><strong id="kpiOverall">0%</strong></div>
-        <div class="live-kpi-card"><span>Lektionen</span><strong id="kpiLessons">0</strong></div>
-        <div class="live-kpi-card"><span>Vokabeln</span><strong id="kpiWords">0</strong></div>
-        <div class="live-kpi-card"><span>Gelernt</span><strong id="kpiLearned">0</strong></div>
-        <div class="live-kpi-card"><span>Schwierig</span><strong id="kpiLearning">0</strong></div>
-        <div class="live-kpi-card"><span>Neu</span><strong id="kpiUnseen">0</strong></div>
-        <div class="live-kpi-card"><span>Mastered</span><strong id="kpiMastered">0</strong></div>
-        <div class="live-kpi-card"><span>Heute wiederholt</span><strong id="kpiReviewed">0</strong></div>
-        <div class="live-kpi-card"><span>Fällig jetzt</span><strong id="kpiDue">0</strong></div>
-        <div class="live-kpi-card"><span>Durchschnittssicherheit</span><strong id="kpiConfidence">0%</strong></div>
+        <article class="live-kpi-card"><span>Lektionen</span><strong id="kpiLessons">0</strong><em>Aktiv im Fokus</em></article>
+        <article class="live-kpi-card"><span>Vokabeln</span><strong id="kpiWords">0</strong><em>Gesamter Wortschatz</em></article>
+        <article class="live-kpi-card"><span>Gelernt</span><strong id="kpiLearned">0</strong><em>Markiert als gelernt</em></article>
+        <article class="live-kpi-card" id="kpiCardLearning"><span>Schwierig</span><strong id="kpiLearning">0</strong><em>Braucht Wiederholung</em></article>
+        <article class="live-kpi-card"><span>Neu</span><strong id="kpiUnseen">0</strong><em>Noch nicht gesehen</em></article>
+        <article class="live-kpi-card"><span>Mastered</span><strong id="kpiMastered">0</strong><em>Sehr sicher</em></article>
+        <article class="live-kpi-card"><span>Heute wiederholt</span><strong id="kpiReviewed">0</strong><em>Tagesaktivitaet</em></article>
+        <article class="live-kpi-card" id="kpiCardDue"><span>Faellig jetzt</span><strong id="kpiDue">0</strong><em>Dringende Karten</em></article>
+        <article class="live-kpi-card"><span>Durchschnittssicherheit</span><strong id="kpiConfidence">0%</strong><em>Stabilitaet im Abruf</em></article>
     </div>
 
     <section class="live-lessons-section">
-        <h2>Lesson Breakdown</h2>
+        <div class="live-section-head">
+            <h2>Lektionsradar</h2>
+            <p>Sortiert nach niedrigstem Fortschritt</p>
+        </div>
         <div class="live-lessons-list" id="liveLessonsList"></div>
     </section>
 </main>
 
 <script>
+function asInt(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+}
+
+function clampPercent(value) {
+    return Math.max(0, Math.min(100, asInt(value)));
+}
+
+function getHealthLabel(due, learning, words) {
+    const safeWords = Math.max(1, words);
+    const pressure = ((due * 1.2) + learning) / safeWords;
+
+    if (pressure >= 0.45) {
+        return { text: 'Kritisch: Fokus auf faellige Karten', tone: 'is-critical' };
+    }
+    if (pressure >= 0.2) {
+        return { text: 'Aktiv: Gute Lernphase', tone: 'is-active' };
+    }
+    return { text: 'Stabil: Sehr guter Rhythmus', tone: 'is-stable' };
+}
+
 async function loadLiveStats() {
     try {
         const response = await fetch('/api/live-stats');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
         const data = await response.json();
         const totals = data.totals || {};
+        const overallProgress = clampPercent(totals.overall_progress);
+        const avgConfidence = clampPercent(totals.avg_confidence);
+        const dueNow = asInt(totals.due);
+        const learningNow = asInt(totals.learning);
+        const totalWords = asInt(totals.words);
 
-        document.getElementById('kpiOverall').textContent = `${totals.overall_progress || 0}%`;
-        document.getElementById('kpiLessons').textContent = `${totals.lessons || 0}`;
-        document.getElementById('kpiWords').textContent = `${totals.words || 0}`;
-        document.getElementById('kpiLearned').textContent = `${totals.learned || 0}`;
-        document.getElementById('kpiLearning').textContent = `${totals.learning || 0}`;
-        document.getElementById('kpiUnseen').textContent = `${totals.unseen || 0}`;
-        document.getElementById('kpiMastered').textContent = `${totals.mastered || 0}`;
-        document.getElementById('kpiReviewed').textContent = `${totals.reviewed_today || 0}`;
-        document.getElementById('kpiDue').textContent = `${totals.due || 0}`;
-        document.getElementById('kpiConfidence').textContent = `${totals.avg_confidence || 0}%`;
+        document.getElementById('kpiOverall').textContent = `${overallProgress}%`;
+        document.getElementById('heroOverallBar').style.width = `${overallProgress}%`;
+
+        document.getElementById('kpiLessons').textContent = `${asInt(totals.lessons)}`;
+        document.getElementById('kpiWords').textContent = `${totalWords}`;
+        document.getElementById('kpiLearned').textContent = `${asInt(totals.learned)}`;
+        document.getElementById('kpiLearning').textContent = `${learningNow}`;
+        document.getElementById('kpiUnseen').textContent = `${asInt(totals.unseen)}`;
+        document.getElementById('kpiMastered').textContent = `${asInt(totals.mastered)}`;
+        document.getElementById('kpiReviewed').textContent = `${asInt(totals.reviewed_today)}`;
+        document.getElementById('kpiDue').textContent = `${dueNow}`;
+        document.getElementById('kpiConfidence').textContent = `${avgConfidence}%`;
+
+        const dueCard = document.getElementById('kpiCardDue');
+        dueCard.classList.toggle('is-hot', dueNow >= 25);
+
+        const learningCard = document.getElementById('kpiCardLearning');
+        learningCard.classList.toggle('is-hot', learningNow >= 35);
 
         const updatedAt = new Date();
         document.getElementById('liveStatsUpdated').textContent = `Aktualisiert: ${updatedAt.toLocaleTimeString('de-DE')}`;
+
+        const health = getHealthLabel(dueNow, learningNow, totalWords);
+        const healthBadge = document.getElementById('liveHealthBadge');
+        healthBadge.textContent = health.text;
+        healthBadge.className = `live-status-pill ${health.tone}`;
 
         const lessons = Array.isArray(data.lessons) ? data.lessons : [];
         const list = document.getElementById('liveLessonsList');
@@ -57,26 +119,33 @@ async function loadLiveStats() {
         }
 
         lessons.forEach(lesson => {
+            const progress = clampPercent(lesson.progress);
+            const toneClass = progress >= 80 ? 'is-strong' : progress >= 45 ? 'is-growing' : 'is-critical';
+
             const item = document.createElement('div');
-            item.className = 'live-lesson-item';
+            item.className = `live-lesson-item ${toneClass}`;
             item.innerHTML = `
                 <div class="live-lesson-top">
                     <h3>${lesson.lesson_name}</h3>
-                    <span>${lesson.progress}%</span>
+                    <span class="live-lesson-progress">${progress}%</span>
                 </div>
                 <div class="live-lesson-bar">
-                    <div class="live-lesson-fill" style="width:${lesson.progress}%"></div>
+                    <div class="live-lesson-fill" style="width:${progress}%"></div>
                 </div>
                 <div class="live-lesson-meta">
-                    <span>${lesson.learned}/${lesson.total} gelernt</span>
-                    <span>${lesson.learning} schwierig</span>
-                    <span>${lesson.mastered} mastered</span>
+                    <span class="live-chip">${asInt(lesson.learned)}/${asInt(lesson.total)} gelernt</span>
+                    <span class="live-chip">${asInt(lesson.learning)} schwierig</span>
+                    <span class="live-chip">${asInt(lesson.mastered)} mastered</span>
+                    <span class="live-chip">${asInt(lesson.due)} faellig</span>
                 </div>
             `;
             list.appendChild(item);
         });
     } catch (err) {
         console.error('Live stats error:', err);
+        const healthBadge = document.getElementById('liveHealthBadge');
+        healthBadge.textContent = 'Offline: Verbindung pruefen';
+        healthBadge.className = 'live-status-pill is-critical';
     }
 }
 
