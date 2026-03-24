@@ -425,6 +425,11 @@ body.minimal-mode .counter {
     display: none;
 }
 
+body.fullscreen-mode .nav,
+body.fullscreen-mode .hinweis {
+    display: none;
+}
+
 @media (max-width: 600px) {
     .vocab-word {
         font-size: 2.25rem;
@@ -449,6 +454,34 @@ body.minimal-mode .counter {
 
     .mobile-fullscreen-btn {
         display: block;
+    }
+}
+
+@media (max-width: 800px) and (orientation: portrait) {
+    .controls {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 1rem;
+        width: 100%;
+        margin-top: 0;
+        padding: 0 1rem;
+        justify-content: space-between;
+        z-index: 850;
+    }
+
+    .control-btn {
+        min-width: 7rem;
+        padding: 0.85rem 1.25rem;
+        border-radius: 999px;
+    }
+
+    .counter {
+        bottom: 5rem;
+    }
+
+    .mobile-fullscreen-btn {
+        bottom: 5rem;
     }
 }
 

@@ -37,6 +37,10 @@ function updateFullscreenButtonLabel() {
     fullscreenBtn.textContent = getFullscreenElement() ? 'Normal' : 'Vollbild';
 }
 
+function syncFullscreenModeClass() {
+    document.body.classList.toggle('fullscreen-mode', !!getFullscreenElement());
+}
+
 function enterFullscreen() {
     const el = document.documentElement;
     if (el.requestFullscreen) return el.requestFullscreen();
@@ -69,9 +73,16 @@ if (fullscreenBtn) {
         });
 
         updateFullscreenButtonLabel();
-        document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
-        document.addEventListener('webkitfullscreenchange', updateFullscreenButtonLabel);
-        document.addEventListener('MSFullscreenChange', updateFullscreenButtonLabel);
+        syncFullscreenModeClass();
+
+        const handleFullscreenChange = () => {
+            updateFullscreenButtonLabel();
+            syncFullscreenModeClass();
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     }
 }
 
