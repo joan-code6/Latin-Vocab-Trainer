@@ -85,6 +85,26 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Updating Production Safely
+
+If you deploy updates with `rsync --delete`, preserve runtime files that are not in git.
+
+```bash
+sudo rsync -av --delete \
+  --exclude ".git" \
+  --exclude "venv" \
+  --exclude "flask_app/app.db" \
+  --exclude ".env" \
+  ~/production/Latin-Vocab-Trainer/ /var/www/latin-vocab-trainer/
+```
+
+Then restart:
+
+```bash
+sudo chown -R www-data:www-data /var/www/latin-vocab-trainer
+sudo systemctl restart latin-vocab
+```
+
 ## Adding Lessons
 
 Add JSON files to the root directory and update `index.json`:

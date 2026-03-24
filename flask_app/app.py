@@ -17,6 +17,9 @@ db.init_app(app)
 login = LoginManager(app)
 login.login_view = 'login'
 
+with app.app_context():
+    db.create_all()
+
 @login.user_loader
 def load_user(id):
     return User.query.get(int(id))
@@ -28,7 +31,6 @@ except ImportError:
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
         workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         index_path = os.path.join(workspace_root, 'index.json')
         if os.path.exists(index_path):
