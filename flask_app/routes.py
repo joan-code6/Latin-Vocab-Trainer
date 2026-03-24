@@ -16,6 +16,13 @@ except ImportError:
 LEARNING_POOL_SIZE = 6
 STREAK_TO_LEARN = 3
 
+def has_ever_learned(stats):
+    if not stats:
+        return False
+    if stats.is_learned:
+        return True
+    return (stats.correct_count or 0) >= STREAK_TO_LEARN
+
 @app.route('/')
 @login_required
 def index():
@@ -154,6 +161,23 @@ def get_next_word():
         if not candidates:
             return None
 
+        if selected_lesson_count > 1:
+            by_lesson = {}
+            for item in candidates:
+                by_lesson.setdefault(item['word'].lesson_id, []).append(item)
+
+            chosen_lesson = random.choice(list(by_lesson.keys()))
+            lesson_candidates = by_lesson[chosen_lesson]
+
+            if key_fn is not None:
+                lesson_candidates = sorted(lesson_candidates, key=key_fn, reverse=reverse)
+
+            if focused_band and len(lesson_candidates) > 2:
+                band_size = max(2, min(6, len(lesson_candidates) // 3))
+                lesson_candidates = lesson_candidates[:band_size]
+
+            return random.choice(lesson_candidates)
+
         ordered = candidates
         if key_fn is not None:
             ordered = sorted(candidates, key=key_fn, reverse=reverse)
@@ -161,22 +185,6 @@ def get_next_word():
         if focused_band and len(ordered) > 2:
             band_size = max(2, min(6, len(ordered) // 3))
             ordered = ordered[:band_size]
-
-        if selected_lesson_count > 1:
-            if key_fn is not None:
-                # Pick a top candidate per lesson first, then randomize across lessons.
-                best_per_lesson = {}
-                for item in ordered:
-                    lesson_id = item['word'].lesson_id
-                    if lesson_id not in best_per_lesson:
-                        best_per_lesson[lesson_id] = item
-                return random.choice(list(best_per_lesson.values()))
-
-            by_lesson = {}
-            for item in ordered:
-                by_lesson.setdefault(item['word'].lesson_id, []).append(item)
-            chosen_lesson = random.choice(list(by_lesson.keys()))
-            return random.choice(by_lesson[chosen_lesson])
 
         return random.choice(ordered)
     
@@ -334,6 +342,7 @@ def get_learning_status():
     learned = 0
     mastered = 0
     rest = 0
+    learned_ever = 0
     
     learning_words = []
     
@@ -343,6 +352,9 @@ def get_learning_status():
         if not stats:
             rest += 1
             continue
+
+        if has_ever_learned(stats):
+            learned_ever += 1
         
         if stats.streak >= 5:
             mastered += 1
@@ -365,8 +377,9 @@ def get_learning_status():
         'learning': learning,
         'learned': learned,
         'mastered': mastered,
+        'learned_ever': learned_ever,
         'learning_words': learning_words,
-        'overall_progress': round(((learned + mastered) / total) * 100) if total > 0 else 0
+        'overall_progress': round((learned_ever / total) * 100) if total > 0 else 0
     })
 
 @app.route('/api/get_progress', methods=['POST'])
@@ -386,6 +399,7 @@ def get_progress():
     total_confidence = 0.0
     total_accuracy = 0.0
     learned_count = 0
+    learned_ever_count = 0
 
     for word in words:
         stats = UserWordStats.query.filter_by(user_id=current_user.id, word_id=word.id).first()
@@ -393,6 +407,8 @@ def get_progress():
             total_confidence += stats.confidence
             if stats.is_learned:
                 learned_count += 1
+            if has_ever_learned(stats):
+                learned_ever_count += 1
 
             correct = stats.correct_count or 0
             wrong = stats.wrong_count or 0
@@ -401,7 +417,7 @@ def get_progress():
                 total_accuracy += correct / attempts
 
     total_words = len(words)
-    mastery_progress = learned_count / total_words
+    mastery_progress = learned_ever_count / total_words
     confidence_progress = total_confidence / total_words
     accuracy_progress = total_accuracy / total_words
 
@@ -416,6 +432,7 @@ def get_progress():
     return jsonify({
         'progress': max(0.0, min(1.0, blended_progress)),
         'learned_count': learned_count,
+        'learned_ever_count': learned_ever_count,
         'total_count': total_words,
         'mastery_progress': mastery_progress,
         'confidence_progress': confidence_progress,
@@ -443,6 +460,7 @@ def get_progress_breakdown():
         
         total = len(words)
         learned = 0
+        learned_ever = 0
         mastered = 0
         learning = 0
         new_count = 0
@@ -451,22 +469,27 @@ def get_progress_breakdown():
             stats = UserWordStats.query.filter_by(user_id=current_user.id, word_id=word.id).first()
             if not stats:
                 new_count += 1
-            elif stats.streak >= 5:
-                mastered += 1
-                learned += 1
-            elif stats.is_learned:
-                learned += 1
-            elif stats.streak > 0:
-                learning += 1
             else:
-                new_count += 1
+                if has_ever_learned(stats):
+                    learned_ever += 1
+
+                if stats.streak >= 5:
+                    mastered += 1
+                    learned += 1
+                elif stats.is_learned:
+                    learned += 1
+                elif stats.streak > 0:
+                    learning += 1
+                else:
+                    new_count += 1
         
         result.append({
             'lesson_id': lesson_id,
             'lesson_name': lesson.name,
-            'progress': learned / total if total > 0 else 0.0,
+            'progress': learned_ever / total if total > 0 else 0.0,
             'total': total,
             'learned': learned,
+            'learned_ever': learned_ever,
             'mastered': mastered,
             'learning': learning,
             'new': new_count
@@ -498,6 +521,7 @@ def live_stats_data():
 
     total_words = len(words)
     learned = 0
+    learned_ever = 0
     mastered = 0
     learning = 0
     unseen = 0
@@ -516,6 +540,8 @@ def live_stats_data():
         lesson_learned = 0
         lesson_learning = 0
         lesson_mastered = 0
+        lesson_learned_ever = 0
+        lesson_due = 0
 
         for word in lesson_words:
             stat = stats_by_word.get(word.id)
@@ -531,6 +557,11 @@ def live_stats_data():
 
             if stat.is_due:
                 due += 1
+                lesson_due += 1
+
+            if has_ever_learned(stat):
+                learned_ever += 1
+                lesson_learned_ever += 1
 
             if stat.streak >= 5:
                 mastered += 1
@@ -544,13 +575,15 @@ def live_stats_data():
                 learning += 1
                 lesson_learning += 1
 
-        progress = round((lesson_learned / lesson_total) * 100) if lesson_total > 0 else 0
+        progress = round((lesson_learned_ever / lesson_total) * 100) if lesson_total > 0 else 0
         per_lesson.append({
             'lesson_name': lesson.name,
             'total': lesson_total,
             'learned': lesson_learned,
+            'learned_ever': lesson_learned_ever,
             'learning': lesson_learning,
             'mastered': lesson_mastered,
+            'due': lesson_due,
             'progress': progress
         })
 
@@ -571,7 +604,7 @@ def live_stats_data():
             'due': due,
             'reviewed_today': reviewed_today,
             'avg_confidence': avg_confidence,
-            'overall_progress': round((learned / total_words) * 100) if total_words > 0 else 0
+            'overall_progress': round((learned_ever / total_words) * 100) if total_words > 0 else 0
         },
         'lessons': per_lesson
     })
