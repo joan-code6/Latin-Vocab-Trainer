@@ -40,14 +40,18 @@ async function loadLessonStats() {
         data.forEach(lessonData => {
             const card = document.querySelector(`[data-lesson-id="${lessonData.lesson_id}"]`);
             if (!card) return;
-            
-            const progress = Math.round(lessonData.progress * 100);
+
+            const progress = Math.round((lessonData.progress || 0) * 100);
+            const total = lessonData.total ?? lessonData.word_count ?? 0;
+            const learned = lessonData.learned ?? Math.max(0, total - (lessonData.weak_count ?? 0));
+            const weak = lessonData.learning ?? lessonData.weak_count ?? 0;
+
             card.querySelector('.lesson-progress-fill').style.width = progress + '%';
             card.querySelector('.lesson-progress-text').textContent = progress + '%';
             card.querySelector('.word-count').textContent = 
-                `${lessonData.word_count - lessonData.weak_count} / ${lessonData.word_count} Vokabeln`;
+                `${learned} / ${total} Vokabeln`;
             card.querySelector('.weak-count').textContent = 
-                `${lessonData.weak_count} schwierige`;
+                `${weak} schwierige`;
         });
     } catch (error) {
         console.error('Error loading stats:', error);

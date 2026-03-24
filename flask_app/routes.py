@@ -74,6 +74,10 @@ def get_next_word():
         return jsonify({'error': 'No lessons selected'}), 400
 
     words = Word.query.filter(Word.lesson_id.in_(lesson_ids)).all()
+    if not words:
+        return jsonify({'error': 'No words available'}), 400
+
+    selected_lesson_count = len({w.lesson_id for w in words})
     
     word_stats = {}
     for word in words:
@@ -105,12 +109,76 @@ def get_next_word():
             rest_pool.append(data)
     
     if len(learning_pool) < LEARNING_POOL_SIZE:
-        rest_pool.sort(key=lambda x: x['confidence'])
         needed = LEARNING_POOL_SIZE - len(learning_pool)
-        for i in range(min(needed, len(rest_pool))):
-            learning_pool.append(rest_pool.pop(0))
+        rest_by_conf = sorted(rest_pool, key=lambda x: x['confidence'])
+
+        if selected_lesson_count > 1:
+            lesson_queues = {}
+            for item in rest_by_conf:
+                lesson_queues.setdefault(item['word'].lesson_id, []).append(item)
+
+            moved = []
+            while needed > 0 and lesson_queues:
+                for lesson_id in list(lesson_queues.keys()):
+                    if needed <= 0:
+                        break
+                    queue = lesson_queues[lesson_id]
+                    if queue:
+                        moved_item = queue.pop(0)
+                        moved.append(moved_item)
+                        needed -= 1
+                    if not queue:
+                        del lesson_queues[lesson_id]
+
+            moved_ids = {item['word'].id for item in moved}
+            learning_pool.extend(moved)
+            rest_pool = [item for item in rest_pool if item['word'].id not in moved_ids]
+        else:
+            for i in range(min(needed, len(rest_by_conf))):
+                learning_pool.append(rest_by_conf[i])
+            moved_ids = {item['word'].id for item in learning_pool}
+            rest_pool = [item for item in rest_pool if item['word'].id not in moved_ids]
     
     learning_pool.sort(key=lambda x: (x['negative_streak'] > 0, x['confidence']))
+
+    def exclude_last(pool):
+        if not pool:
+            return []
+        if last_word_id is None or len(pool) <= 1:
+            return pool
+        filtered = [item for item in pool if item['word'].id != last_word_id]
+        return filtered if filtered else pool
+
+    def pick_from_pool(pool, key_fn=None, reverse=False, focused_band=False):
+        candidates = exclude_last(pool)
+        if not candidates:
+            return None
+
+        ordered = candidates
+        if key_fn is not None:
+            ordered = sorted(candidates, key=key_fn, reverse=reverse)
+
+        if focused_band and len(ordered) > 2:
+            band_size = max(2, min(6, len(ordered) // 3))
+            ordered = ordered[:band_size]
+
+        if selected_lesson_count > 1:
+            if key_fn is not None:
+                # Pick a top candidate per lesson first, then randomize across lessons.
+                best_per_lesson = {}
+                for item in ordered:
+                    lesson_id = item['word'].lesson_id
+                    if lesson_id not in best_per_lesson:
+                        best_per_lesson[lesson_id] = item
+                return random.choice(list(best_per_lesson.values()))
+
+            by_lesson = {}
+            for item in ordered:
+                by_lesson.setdefault(item['word'].lesson_id, []).append(item)
+            chosen_lesson = random.choice(list(by_lesson.keys()))
+            return random.choice(by_lesson[chosen_lesson])
+
+        return random.choice(ordered)
     
     chosen_word = None
     tier_source = 'rest'
@@ -118,53 +186,57 @@ def get_next_word():
     roll = random.random()
     
     if learning_pool and roll < 0.60:
-        random.shuffle(learning_pool)
-        chosen_word = learning_pool[0]
+        chosen_word = pick_from_pool(learning_pool)
         tier_source = 'learning'
     elif roll < 0.90:
         if rest_pool:
-            for w in sorted(rest_pool, key=lambda x: x['confidence']):
-                if w['word'].id != last_word_id:
-                    chosen_word = w
-                    break
-            if not chosen_word:
-                chosen_word = random.choice(rest_pool)
+            chosen_word = pick_from_pool(
+                rest_pool,
+                key_fn=lambda x: x['confidence'],
+                reverse=False,
+                focused_band=True
+            )
             tier_source = 'rest'
         else:
             roll = 0.70
     elif roll < 0.98:
         if learned_pool:
-            for w in sorted(learned_pool, key=lambda x: x['stats'].days_since_review if x['stats'] else 999, reverse=True):
-                if w['word'].id != last_word_id:
-                    chosen_word = w
-                    break
-            if not chosen_word and learned_pool:
-                chosen_word = random.choice(learned_pool)
+            chosen_word = pick_from_pool(
+                learned_pool,
+                key_fn=lambda x: x['stats'].days_since_review if x['stats'] else 999,
+                reverse=True,
+                focused_band=True
+            )
             tier_source = 'learned'
         else:
             roll = 0.92
     else:
         if mastered_pool:
-            chosen_word = random.choice(mastered_pool)
+            chosen_word = pick_from_pool(mastered_pool)
             tier_source = 'mastered'
         else:
             roll = 0.50
     
     if not chosen_word:
         if learning_pool:
-            chosen_word = random.choice(learning_pool)
+            chosen_word = pick_from_pool(learning_pool)
             tier_source = 'learning'
         elif rest_pool:
-            chosen_word = random.choice(rest_pool)
+            chosen_word = pick_from_pool(rest_pool, key_fn=lambda x: x['confidence'], focused_band=True)
             tier_source = 'rest'
         elif learned_pool:
-            chosen_word = random.choice(learned_pool)
+            chosen_word = pick_from_pool(learned_pool, key_fn=lambda x: x['stats'].days_since_review if x['stats'] else 999, reverse=True)
             tier_source = 'learned'
         elif mastered_pool:
-            chosen_word = random.choice(mastered_pool)
+            chosen_word = pick_from_pool(mastered_pool)
             tier_source = 'mastered'
         else:
             return jsonify({'error': 'No words available'}), 400
+
+    if chosen_word and last_word_id is not None and chosen_word['word'].id == last_word_id and len(words) > 1:
+        alternatives = [data for data in word_stats.values() if data['word'].id != last_word_id]
+        if alternatives:
+            chosen_word = random.choice(alternatives)
     
     word_obj = chosen_word['word']
     stats_obj = chosen_word['stats']
