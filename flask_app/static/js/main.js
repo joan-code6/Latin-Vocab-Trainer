@@ -35,8 +35,31 @@ function startSession() {
     document.getElementById('controls').style.display = 'flex';
     document.getElementById('sessionStats').style.display = 'flex';
     document.getElementById('counter').style.display = 'block';
+
+    refreshOverallProgress();
     
     fetchNextWord();
+}
+
+function refreshOverallProgress() {
+    if (!selectedLessons || selectedLessons.length === 0) {
+        updateProgressBar(0);
+        return;
+    }
+
+    fetch('/api/get_progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lessons: selectedLessons }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        const progress = typeof data.progress === 'number' ? data.progress : 0;
+        updateProgressBar(Math.round(progress * 100));
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
 }
 
 function fetchNextWord() {
@@ -106,9 +129,7 @@ function submitResult(isCorrect) {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.lesson_progress) {
-            updateProgressBar(data.lesson_progress.percent);
-        }
+        refreshOverallProgress();
         updateStats();
     })
     .catch((error) => {
