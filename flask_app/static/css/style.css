@@ -285,6 +285,33 @@ body.dark-mode .btn-correct:hover {
     margin-bottom: 1.5rem;
     max-height: 300px;
     overflow-y: auto;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.lektion-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.lektion-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lektion-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.lektion-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.lektion-list > div {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
 }
 
 .lektion-checkbox {
@@ -292,6 +319,7 @@ body.dark-mode .btn-correct:hover {
 }
 
 .lektion-label {
+    flex: 1;
     padding: 0.75rem 1rem;
     background: var(--bg);
     border-radius: 0.5rem;
@@ -300,6 +328,8 @@ body.dark-mode .btn-correct:hover {
     color: var(--text-muted);
     transition: all 0.15s;
     text-align: left;
+    display: block;
+    white-space: nowrap;
 }
 
 .lektion-label:hover {
