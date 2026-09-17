@@ -1,4 +1,5 @@
 flask_app/venv/
+venv/
 __pycache__/
 flask_app/__pycache__/
 *.pyc
